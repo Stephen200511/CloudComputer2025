@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "concept": "熵",
+    "evidence": {
+      "熵->信息论:定义": [
+        {
+          "title": "A Mathematical Theory of Communication",
+          "authors": "Claude E. Shannon",
+          "year": "1948",
+          "source": "Bell System Technical Journal",
+          "identifier": "arXiv:2107.05013",
+          "url": "https://ieeexplore.ieee.org/document/6773024"
+        },
+        {
+          "title": "Entropy as a Topological Operad Derivation",
+          "summary": "We share a small connection between information theory, algebra, and topology - namely, a correspondence between Shannon entropy and derivations of the operad of topological simplices. We begin with a",
+          "url": "https://arxiv.org/pdf/2107.09581v2",
+          "authors": "Tai-Danae Bradley"
+        },
+        {
+          "title": "Information theory and Thermodynamics",
+          "summary": "A communication theory for a transmitter broadcasting to many receivers is presented. In this case energetic considerations cannot be neglected as in Shannon theory. It is shown that, when energy is a",
+          "url": "https://arxiv.org/pdf/cs/0602023v1",
+          "authors": "Oded Kafri"
+        }
+      ]
+    },
+    "no_association": []
+  },
+  "nodes": [
+    {
+      "node_id": "熵",
+      "name": "熵",
+      "domain": "",
+      "definition": "",
+      "confidence": 1.0
+    },
+    {
+      "node_id": "信息论",
+      "name": "信息论",
+      "domain": "数学",
+      "definition": "信息论中熵刻画不确定性与平均信息量。",
+      "confidence": 1.0
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "熵->信息论:定义",
+      "source_node_id": "熵",
+      "target_node_id": "信息论",
+      "relation_type": "定义",
+      "relation_desc": "信息论中熵刻画不确定性与平均信息量。",
+      "confidence": 1.0
+    }
+  ]
+}

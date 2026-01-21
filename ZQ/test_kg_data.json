@@ -1,0 +1,269 @@
+{
+  "meta": {
+    "core_concept": "跨学科基础概念",
+    "create_time": "2026-01-21",
+    "confidence_filter": 0.6
+  },
+  "nodes": [
+    {
+      "node_id": "c001",
+      "name": "集合论",
+      "domain": "数学",
+      "definition": "研究集合及其性质的数学分支",
+      "confidence": 0.95
+    },
+    {
+      "node_id": "c002",
+      "name": "概率论",
+      "domain": "数学",
+      "definition": "研究随机现象数量规律的数学分支",
+      "confidence": 0.96
+    },
+    {
+      "node_id": "c003",
+      "name": "微积分",
+      "domain": "数学",
+      "definition": "研究变化和积分的数学分支",
+      "confidence": 0.98
+    },
+    {
+      "node_id": "c004",
+      "name": "线性代数",
+      "domain": "数学",
+      "definition": "研究向量空间和线性映射的数学分支",
+      "confidence": 0.97
+    },
+    {
+      "node_id": "c005",
+      "name": "牛顿力学",
+      "domain": "物理",
+      "definition": "经典力学的基础理论",
+      "confidence": 0.99
+    },
+    {
+      "node_id": "c006",
+      "name": "热力学",
+      "domain": "物理",
+      "definition": "研究热现象的物理学分支",
+      "confidence": 0.96
+    },
+    {
+      "node_id": "c007",
+      "name": "量子力学",
+      "domain": "物理",
+      "definition": "描述微观粒子行为的物理学理论",
+      "confidence": 0.94
+    },
+    {
+      "node_id": "c008",
+      "name": "相对论",
+      "domain": "物理",
+      "definition": "爱因斯坦提出的时空理论",
+      "confidence": 0.93
+    },
+    {
+      "node_id": "c009",
+      "name": "算法",
+      "domain": "计算机科学",
+      "definition": "解决问题的明确步骤",
+      "confidence": 0.97
+    },
+    {
+      "node_id": "c010",
+      "name": "数据结构",
+      "domain": "计算机科学",
+      "definition": "数据的组织、管理和存储格式",
+      "confidence": 0.96
+    },
+    {
+      "node_id": "c011",
+      "name": "机器学习",
+      "domain": "计算机科学",
+      "definition": "让计算机从数据中学习的技术",
+      "confidence": 0.92
+    },
+    {
+      "node_id": "c012",
+      "name": "神经网络",
+      "domain": "计算机科学",
+      "definition": "模拟人脑神经元的计算模型",
+      "confidence": 0.91
+    },
+    {
+      "node_id": "c013",
+      "name": "信息熵",
+      "domain": "信息论",
+      "definition": "信息不确定性的度量",
+      "confidence": 0.95
+    },
+    {
+      "node_id": "c014",
+      "name": "香农定理",
+      "domain": "信息论",
+      "definition": "信道容量的计算公式",
+      "confidence": 0.93
+    },
+    {
+      "node_id": "c015",
+      "name": "编码理论",
+      "domain": "信息论",
+      "definition": "研究信息编码和传输的理论",
+      "confidence": 0.92
+    },
+    {
+      "node_id": "c016",
+      "name": "熵",
+      "domain": "物理",
+      "definition": "热力学中表征物质状态的参量",
+      "confidence": 0.95
+    },
+    {
+      "node_id": "c017",
+      "name": "熵",
+      "domain": "信息论",
+      "definition": "信息不确定性的度量",
+      "confidence": 0.92
+    },
+    {
+      "node_id": "c018",
+      "name": "优化",
+      "domain": "数学",
+      "definition": "寻找最佳解决方案的过程",
+      "confidence": 0.94
+    },
+    {
+      "node_id": "c019",
+      "name": "优化算法",
+      "domain": "计算机科学",
+      "definition": "解决优化问题的计算方法",
+      "confidence": 0.91
+    },
+    {
+      "node_id": "c020",
+      "name": "进化论",
+      "domain": "生物学",
+      "definition": "生物种群特征随时间变化的理论",
+      "confidence": 0.97
+    },
+    {
+      "node_id": "c021",
+      "name": "博弈论",
+      "domain": "经济学",
+      "definition": "研究策略互动的数学理论",
+      "confidence": 0.94
+    },
+    {
+      "node_id": "c022",
+      "name": "社会网络",
+      "domain": "社会学",
+      "definition": "社会实体间关系的集合",
+      "confidence": 0.89
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "r001",
+      "source_node_id": "c001",
+      "target_node_id": "c002",
+      "relation_type": "FOUNDATION_OF",
+      "relation_desc": "概率论建立在集合论基础上",
+      "confidence": 0.85
+    },
+    {
+      "edge_id": "r002",
+      "source_node_id": "c003",
+      "target_node_id": "c002",
+      "relation_type": "TOOL_FOR",
+      "relation_desc": "微积分是概率论的重要工具",
+      "confidence": 0.82
+    },
+    {
+      "edge_id": "r003",
+      "source_node_id": "c005",
+      "target_node_id": "c006",
+      "relation_type": "APPLIED_IN",
+      "relation_desc": "牛顿力学应用于热力学研究",
+      "confidence": 0.78
+    },
+    {
+      "edge_id": "r004",
+      "source_node_id": "c007",
+      "target_node_id": "c008",
+      "relation_type": "COMPLEMENTARY_WITH",
+      "relation_desc": "量子力学与相对论是现代物理两大支柱",
+      "confidence": 0.75
+    },
+    {
+      "edge_id": "r005",
+      "source_node_id": "c009",
+      "target_node_id": "c010",
+      "relation_type": "DEPENDS_ON",
+      "relation_desc": "算法效率依赖于数据结构",
+      "confidence": 0.92
+    },
+    {
+      "edge_id": "r006",
+      "source_node_id": "c011",
+      "target_node_id": "c012",
+      "relation_type": "INCLUDES",
+      "relation_desc": "神经网络是机器学习的重要分支",
+      "confidence": 0.88
+    },
+    {
+      "edge_id": "r007",
+      "source_node_id": "c016",
+      "target_node_id": "c017",
+      "relation_type": "ANALOGOUS_TO",
+      "relation_desc": "热力学熵与信息熵的数学形式相似",
+      "confidence": 0.82
+    },
+    {
+      "edge_id": "r008",
+      "source_node_id": "c018",
+      "target_node_id": "c019",
+      "relation_type": "APPLIED_IN",
+      "relation_desc": "数学优化理论应用于计算机算法设计",
+      "confidence": 0.86
+    },
+    {
+      "edge_id": "r009",
+      "source_node_id": "c002",
+      "target_node_id": "c013",
+      "relation_type": "FOUNDATION_OF",
+      "relation_desc": "信息熵基于概率论定义",
+      "confidence": 0.91
+    },
+    {
+      "edge_id": "r010",
+      "source_node_id": "c007",
+      "target_node_id": "c012",
+      "relation_type": "INSPIRED_BY",
+      "relation_desc": "量子力学启发了量子神经网络研究",
+      "confidence": 0.72
+    },
+    {
+      "edge_id": "r011",
+      "source_node_id": "c020",
+      "target_node_id": "c011",
+      "relation_type": "INSPIRED_BY",
+      "relation_desc": "进化论启发了遗传算法设计",
+      "confidence": 0.68
+    },
+    {
+      "edge_id": "r012",
+      "source_node_id": "c021",
+      "target_node_id": "c011",
+      "relation_type": "APPLIED_IN",
+      "relation_desc": "博弈论应用于多智能体系统研究",
+      "confidence": 0.76
+    },
+    {
+      "edge_id": "r013",
+      "source_node_id": "c022",
+      "target_node_id": "c012",
+      "relation_type": "ANALOGOUS_TO",
+      "relation_desc": "社会网络与神经网络结构的相似性",
+      "confidence": 0.65
+    }
+  ]
+}

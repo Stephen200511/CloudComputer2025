@@ -10,6 +10,26 @@ let nodeSize = 20;
 let edgeWidth = 2;
 let selectedNodeId = null;
 const API_BASE = "http://localhost:8000"; // 后端地址
+const API_BASE2= "http://localhost:8001"; // 后端地址
+
+/* 
+// 关键修改：从环境变量获取API地址，支持容器化
+const getApiBase = () => {
+  // 1. 优先使用window环境变量（容器注入）
+  // 2. 其次使用全局变量
+  // 3. 最后使用默认值
+  if (window.API_BASE_URL) {
+    return window.API_BASE_URL;
+  }
+  if (typeof API_BASE !== "undefined") {
+    return API_BASE;
+  }
+  return "http://localhost:8000";
+};
+
+const API_BASE = getApiBase();
+console.log("📡 API Base URL:", API_BASE);
+*/
 
 // 学科颜色映射
 const DOMAIN_COLORS = {
@@ -241,8 +261,9 @@ async function loadData() {
 
   try {
     // 调用后端接口获取全量数据
-    const response = await fetch(`${API_BASE}/api/kg/query/all`);
+    const response = await fetch(`${API_BASE2}/api/kg/query/all`);
     const result = await response.json();
+    console.log("后端返回的完整数据：", result);
 
     if (result && result.nodes) {
       // 转换数据格式
@@ -306,7 +327,7 @@ function loadSampleData() {
   allEdges = sampleData.edges;
   currentNodes = [...allNodes];
   currentEdges = [...allEdges];
-
+  
   renderGraph();
   updateStats();
   hideLoading();
@@ -315,7 +336,7 @@ function loadSampleData() {
 
 function getSampleData() {
   return {
-    nodes: [
+nodes: [
       // 数学相关
       {
         id: "math_1",
@@ -584,7 +605,6 @@ function getSampleData() {
     ],
   };
 }
-
 // ============== 图谱渲染 ==============
 function renderGraph() {
   if (!chartInstance) return;
@@ -844,11 +864,16 @@ async function applyFilters() {
     const queryString = selectedDomains
       .map((d) => `domains=${encodeURIComponent(d)}`)
       .join("&");
+    console.log("多领域筛选请求URL参数：", queryString);  
     const response = await fetch(
-      `${API_BASE}/api/kg/query/domain/multi?${queryString}`
+      `${API_BASE2}/api/kg/query/domain/multi?${queryString}`
     );
+    if (!response.ok) {
+      throw new Error(`多领域筛选接口请求失败：${response.status} ${response.statusText}`);
+    }
     const result = await response.json();
-
+    console.log("多领域筛选结果：", result);
+    
     if (result && result.nodes) {
       currentNodes = transformNodes(result.nodes);
       currentEdges = transformEdges(result.edges || []);
@@ -924,12 +949,60 @@ async function searchConcept() {
       )}`
     );
     const result = await response.json();
+    console.log("后端返回的完整数据：", result);
+    
+    const pureResult = JSON.parse(result); //
+    // 提取nodes/edges
+    const nodes = pureResult.nodes || [];
+    const edges = pureResult.edges || [];
+    // 打印验证
+    // console.log("节点列表：", JSON.stringify(nodes, null, 2));
+    // console.log("边列表：", JSON.stringify(edges, null, 2));
+    
+    const kgData = {
+      // 保留原始meta，补全默认值
+      meta: result.meta || { keyword: keyword, upload_time: new Date().toISOString() },
+      // 补全nodes中空字段
+      nodes: nodes.map(node => ({
+        ...node, // 复用原有所有字段（node_id/name/confidence等）
+        domain: node.domain || "未知领域", // 空字符串补为"未知领域"
+        definition: node.definition || "暂无定义", // 空字符串补为"暂无定义"
+        confidence: Math.max(0.6, Math.min(1.0, Number(node.confidence) || 0.8)) // 确保数值范围
+      })),
+      // edges无需修改（你已能拿到合法数据），仅确保字段完整
+      edges: edges.map(edge => ({
+        ...edge,
+        confidence: Math.max(0.6, Math.min(1.0, Number(edge.confidence) || 0.8))
+      }))
+    };
+    console.log("预处理后入库数据：", kgData);
 
-    if (result && result.nodes) {
+    // 将结果入库Neo4j
+    const insertResponse = await fetch(`${API_BASE2}/api/kg/insert/from-front`, {
+      method: "POST", // 入库用POST
+      headers: {"Content-Type": "application/json",},
+      body: JSON.stringify(kgData), // 把前端处理后的kgData转成JSON字符串传给后端
+    });
+
+    // 处理入库结果
+    const insertResult = await insertResponse.json();
+    if (insertResult.code === 200) {
+      console.log("数据成功入库Neo4j：", insertResult);
+      alert("图谱数据已成功存入数据库！");
+    } else {
+      console.error("入库失败：", insertResult.msg);
+      alert(`入库失败：${insertResult.msg}`);
+    }
+
+    // 单独打印核心的nodes和edges
+
+
+    if (result && nodes) {
       // 转换数据格式
-      allNodes = transformNodes(result.nodes);
-      allEdges = transformEdges(result.edges || []);
-
+      allNodes = transformNodes(nodes);
+      allEdges = transformEdges(edges);
+      console.log("转换后的节点数据：", allNodes);
+      console.log("转换后的边数据：", allEdges);
       currentNodes = [...allNodes];
       currentEdges = [...allEdges];
 
@@ -1047,10 +1120,15 @@ async function showRandomGraph() {
     const queryString = randomDomains
       .map((d) => `domains=${encodeURIComponent(d)}`)
       .join("&");
+    console.log("随机探索查询字符串：", queryString);
     const response = await fetch(
-      `${API_BASE}/api/kg/query/domain/multi?${queryString}`
+      `${API_BASE2}/api/kg/query/domain/multi?${queryString}`
     );
+    if (!response.ok) {
+      throw new Error(`多领域筛选接口请求失败：${response.status} ${response.statusText}`);
+    }
     const result = await response.json();
+    console.log("多领域筛选结果：", result);
 
     if (result && result.nodes && result.nodes.length > 0) {
       currentNodes = transformNodes(result.nodes);
@@ -1203,12 +1281,12 @@ function showFullscreen() {
 async function fetchNodeDetail(nodeName) {
   try {
     const response = await fetch(
-      `${API_BASE}/api/kg/query/node/detail?node_name=${encodeURIComponent(
+      `${API_BASE2}/api/kg/query/node/detail?node_name=${encodeURIComponent(
         nodeName
       )}`
     );
     const result = await response.json();
-
+    console.log("节点详情结果：", result);
     if (result && result.node_detail) {
       // 显示更详细的节点信息
       showNodeDetail(result);
@@ -1646,7 +1724,7 @@ async function clearDatabase() {
   showLoading("正在清空数据库...");
 
   try {
-    const response = await fetch(`${API_BASE}/api/kg/clear/all`);
+    const response = await fetch(`${API_BASE2}/api/kg/clear/all`);
     const result = await response.json();
 
     if (result.status === "success") {

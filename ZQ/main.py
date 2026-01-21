@@ -3,9 +3,14 @@ from neo4j import GraphDatabase, basic_auth
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import json
+from datetime import datetime
+import datetime
+from fastapi import Query
+from fastapi import Request 
+
 # Neo4j数据库连接配置
-NEO4J_URI = "bolt://neo4j:7687"
-# NEO4J_URI = "bolt://localhost:7687"  # Docker部署后改成bolt://neo4j:7687
+# NEO4J_URI = "bolt://neo4j:7687"
+NEO4J_URI = "bolt://localhost:7687"  # Docker部署后改成bolt://neo4j:7687
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "zhangqin123"
 driver = GraphDatabase.driver(NEO4J_URI, auth=basic_auth(NEO4J_USER, NEO4J_PASSWORD))
@@ -115,12 +120,36 @@ def format_neo4j_result_to_standard_json(neo4j_result):
 
 # 前端查询窗口接口定义
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware 
 app = FastAPI(title="跨学科知识图谱-后端接口", version="1.0", docs_url="/docs")
+app.add_middleware(
+    CORSMiddleware,
+    # 开发时允许所有来源，便于本地前端（如 server.js:3000）访问。
+    # 生产环境请限定具体域名以保证安全。
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],  # 允许所有请求方法（GET/POST等）
+    allow_headers=["*"],  # 允许所有请求头
+)
 
-@app.post("/api/kg/insert", summary="Agent对接接口：入库图谱数据")
-async def api_insert_kg(kg_data: KGData):
-    return insert_knowledge_graph(kg_data)
+# 接收前端传的result数据，校验后入库Neo4j
+@app.post("/api/kg/insert/from-front", summary="前端传入图谱数据并入库")
+async def insert_kg_from_front(kg_data: Dict):
+    try:
+        # 将前端传的普通JSON转换为标准KGData模型
 
+        # 数据校验（Pydantic自动校验字段类型/必填项）
+        standard_kg_data = KGData(**kg_data)
+
+        # 调用入库函数写入Neo4j
+        insert_result = insert_knowledge_graph(standard_kg_data)
+        return {"code": 200, "msg": "入库成功", "data": insert_result}
+    
+    except Exception as e:
+        # 捕获校验/入库异常，返回错误信息
+        print(f"[ERROR] insert_kg_from_front error: {str(e)}")
+        return {"code": 500,"msg": f"入库失败：{str(e)}", "data": None}
+    
 # 实时渲染：清空Neo4j所有数据
 @app.get("/api/kg/clear/all", summary="清空全库（实时渲染）")
 async def clear_all_data():
@@ -128,22 +157,6 @@ async def clear_all_data():
         # DETACH DELETE会同时删除所有节点+关联边，一步清空
         session.run("MATCH (n) DETACH DELETE n")
     return {"status": "success", "msg": "旧数据已清空，可存入新关键词数据"}
-
-@app.get("/api/kg/query/core", summary="前端核心接口：按核心概念查全图谱")
-async def api_query_core(core_concept: str):
-    with driver.session() as session:
-        result = session.run("""
-            MATCH (core:Concept {name: $core})
-            OPTIONAL MATCH (core)-[*]-(related:Concept)
-            WITH core, collect(DISTINCT related) AS related_nodes
-            WITH core + related_nodes AS all_nodes
-            OPTIONAL MATCH (a:Concept)-[r]-(b:Concept) 
-            WHERE a IN all_nodes AND b IN all_nodes
-            RETURN collect(DISTINCT a) + collect(DISTINCT b) AS nodes, collect(DISTINCT r) AS edges
-        """, core=core_concept)
-        
-        nodes, edges = format_neo4j_result_to_standard_json(result)
-        return {"meta": {"core_concept": core_concept}, "nodes": nodes, "edges": edges}
 
 @app.get("/api/kg/query/all", summary="前端接口：查询全量图谱数据")
 async def api_query_all():
@@ -155,8 +168,7 @@ async def api_query_all():
         nodes, edges = format_neo4j_result_to_standard_json(result)
         return {"meta": {"type": "全量数据"}, "nodes": nodes, "edges": edges}
 
-@app.get("/api/kg/query/domain", summary="前端接口：按学科筛选图谱")
-def api_query_domain(domain: str):
+
     with driver.session() as session:
         result = session.run("""
             MATCH (core:Concept {domain: $domain})
@@ -178,54 +190,56 @@ def api_query_node_detail(node_name: str):
         node_detail = nodes[0] if nodes else {}
         return {"meta": {"node_name": node_name}, "node_detail": node_detail, "nodes": nodes, "edges": edges}
 
-@app.get("/api/kg/query/node/search", summary="前端接口：模糊搜索节点（匹配name/definition）")
-def api_query_node_search(keyword: str):
-    with driver.session() as session:
-        result = session.run("""
-            MATCH (n:Concept)
-            WHERE n.name CONTAINS $keyword OR n.definition CONTAINS $keyword
-            OPTIONAL MATCH (n)-[r]-(related:Concept)
-            WITH collect(DISTINCT n) + collect(DISTINCT related) AS all_nodes, collect(DISTINCT r) AS edges
-            RETURN all_nodes AS nodes, edges
-        """, keyword=keyword)
-        nodes, edges = format_neo4j_result_to_standard_json(result)
-        return {"meta": {"keyword": keyword}, "nodes": nodes, "edges": edges}
-
-@app.get("/api/kg/query/relation/type", summary="前端接口：按关系类型筛选图谱")
-def api_query_relation_type(rel_type: str):
-    with driver.session() as session:
-        result = session.run("""
-            MATCH (a:Concept)-[r]->(b:Concept)
-            WHERE type(r) = $rel_type
-            RETURN collect(DISTINCT a) + collect(DISTINCT b) AS nodes, collect(DISTINCT r) AS edges
-        """, rel_type=rel_type)
-        nodes, edges = format_neo4j_result_to_standard_json(result)
-        return {"meta": {"relation_type": rel_type}, "nodes": nodes, "edges": edges}
-
-@app.get("/api/kg/query/path/shortest", summary="前端接口：查询两个节点的最短关联路径")
-def api_query_shortest_path(start_name: str, end_name: str):
-    with driver.session() as session:
-        result = session.run("""
-            MATCH (start:Concept {name: $start}), (end:Concept {name: $end})
-            MATCH p = shortestPath((start)-[*1..5]-(end))
-            UNWIND nodes(p) AS n
-            UNWIND relationships(p) AS r
-            RETURN collect(DISTINCT n) AS nodes, collect(DISTINCT r) AS edges
-        """, start=start_name, end=end_name)
-        nodes, edges = format_neo4j_result_to_standard_json(result)
-        return {"meta": {"start": start_name, "end": end_name}, "nodes": nodes, "edges": edges}
+from urllib.parse import parse_qs, unquote
 
 @app.get("/api/kg/query/domain/multi", summary="前端接口：多学科联合筛选图谱")
-def api_query_multi_domain(domains: list[str]):
-    with driver.session() as session:
-        result = session.run("""
-            MATCH (n:Concept)
-            WHERE n.domain IN $domains
-            OPTIONAL MATCH (n)-[r]-(related:Concept) WHERE related.domain IN $domains
-            RETURN collect(DISTINCT n) AS nodes, collect(DISTINCT r) AS edges
-        """, domains=domains)
-        nodes, edges = format_neo4j_result_to_standard_json(result)
-        return {"meta": {"domains": domains}, "nodes": nodes, "edges": edges}
+def api_query_multi_domain(request: Request):
+    try:
+        # 打印调试信息
+        print("=== 请求到达了函数 ===")
+        query_string = str(request.url.query)
+        print(f"原始查询字符串: {query_string}")
+        
+        parsed_qs = parse_qs(query_string)
+        print(f"解析后的参数: {parsed_qs}")
+        
+        # 获取domains参数
+        raw_domains = parsed_qs.get('domains', [])
+        print(f"获取到的domains列表: {raw_domains}")
+        
+        valid_domains = []
+        for d in raw_domains:
+            cleaned = d.strip()
+            if cleaned:
+                valid_domains.append(cleaned)
+        
+        valid_domains = list(set(valid_domains))
+        print(f"处理后的有效领域: {valid_domains}")
+        
+        if not valid_domains:
+            return {
+                "meta": {"domains": []}, "nodes": [], "edges": [],  "msg": "请选择有效领域"}
+        
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (n:Concept)
+                WHERE n.domain IN $domains
+                OPTIONAL MATCH (n)-[r]-(related:Concept) WHERE related.domain IN $domains
+                RETURN collect(DISTINCT n) AS nodes, collect(DISTINCT r) AS edges
+            """, domains=valid_domains)
+            nodes, edges = format_neo4j_result_to_standard_json(result)
+            return {
+                "meta": {"domains": valid_domains, "node_count": len(nodes), "edge_count": len(edges)},
+                "nodes": nodes or [],
+                "edges": edges or []
+            }
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        print(f"=== 发生异常 ===")
+        print(error_msg)
+        return {
+            "meta": {"domains": []},"nodes": [],"edges": [],"code": 500,"msg": f"多领域筛选失败：{str(e)}"}
     
 if __name__ == "__main__":
     # 第一步：执行本地入库测试，把JSON数据写入Neo4j
@@ -234,4 +248,5 @@ if __name__ == "__main__":
     import uvicorn
     # Docker部署时，host改成0.0.0.0
     # uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False) 
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=False) 
+    

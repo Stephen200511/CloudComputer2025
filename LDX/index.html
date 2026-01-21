@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>跨学科知识图谱可视化系统</title>
     <link rel="stylesheet" href="style.css" />
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   </head>
   <body>
     <div class="container">
@@ -149,6 +149,32 @@
                 value="2"
                 oninput="updateEdgeWidth(this.value)"
               />
+            </div>
+
+            <!-- 添加数据管理区域 -->
+            <div
+              class="danger-zone"
+              style="
+                margin-top: 16px;
+                padding-top: 16px;
+                border-top: 1px solid #e2e8f0;
+              "
+            >
+              <h4 style="color: #ef4444; margin-bottom: 8px; font-size: 14px">
+                ⚠️ 数据管理
+              </h4>
+              <button
+                onclick="clearDatabase()"
+                class="btn-small"
+                style="
+                  width: 100%;
+                  background: #fef2f2;
+                  color: #dc2626;
+                  border-color: #fca5a5;
+                "
+              >
+                🗑️ 清空数据库
+              </button>
             </div>
           </section>
 

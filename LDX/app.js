@@ -9,6 +9,7 @@ let currentEdges = [];
 let nodeSize = 20;
 let edgeWidth = 2;
 let selectedNodeId = null;
+const API_BASE = "http://localhost:8000"; // 后端地址
 
 // 学科颜色映射
 const DOMAIN_COLORS = {
@@ -234,24 +235,82 @@ function tooltipFormatter(params) {
   return "";
 }
 
-// ============== 数据加载 ==============
-function loadData() {
-  showLoading("正在加载数据...");
+// ============== 数据加载和转换 ==============
+async function loadData() {
+  showLoading("正在从后端加载数据...");
 
-  // 这里可以从本地JSON文件或API加载数据
-  // 我们先使用内置的示例数据
-  setTimeout(() => {
-    const sampleData = getSampleData();
-    allNodes = sampleData.nodes;
-    allEdges = sampleData.edges;
-    currentNodes = [...allNodes];
-    currentEdges = [...allEdges];
+  try {
+    // 调用后端接口获取全量数据
+    const response = await fetch(`${API_BASE}/api/kg/query/all`);
+    const result = await response.json();
 
-    renderGraph();
-    updateStats();
-    hideLoading();
-    updateStatus("数据加载完成");
-  }, 1000);
+    if (result && result.nodes) {
+      // 转换数据格式
+      allNodes = transformNodes(result.nodes);
+      allEdges = transformEdges(result.edges || []);
+
+      currentNodes = [...allNodes];
+      currentEdges = [...allEdges];
+
+      Graph();
+      updateStats();
+      hideLoading();
+      updateStatus(
+        `数据加载完成: ${allNodes.length}个节点, ${allEdges.length}条边`
+      );
+    } else {
+      // 如果后端没数据，使用示例数据
+      console.warn("后端暂无数据，使用示例数据");
+      loadSampleData();
+    }
+  } catch (error) {
+    console.error("API调用失败:", error);
+    updateStatus("后端连接失败，使用本地示例数据");
+    loadSampleData();
+  }
+}
+
+function transformNodes(apiNodes) {
+  return apiNodes.map((node) => ({
+    id: node.id || node.node_id, // 适配后端的node_id字段
+    name: node.name,
+    domain: node.domain,
+    definition: node.definition || node.desc || "",
+    confidence: node.confidence || 0.8,
+    x: node.x || undefined,
+    y: node.y || undefined,
+    // 保留其他原始属性
+    ...node,
+  }));
+}
+
+function transformEdges(apiEdges) {
+  return apiEdges.map((edge) => ({
+    id: `${edge.source || edge.source_node_id}-${
+      edge.target || edge.target_node_id
+    }`,
+    source: edge.source || edge.source_node_id,
+    target: edge.target || edge.target_node_id,
+    relation_type: edge.relation_type || edge.type,
+    relation_desc: edge.relation_desc || edge.desc || "",
+    confidence: edge.confidence || 0.7,
+    evidence: edge.evidence || "",
+    // 保留其他原始属性
+    ...edge,
+  }));
+}
+
+function loadSampleData() {
+  const sampleData = getSampleData();
+  allNodes = sampleData.nodes;
+  allEdges = sampleData.edges;
+  currentNodes = [...allNodes];
+  currentEdges = [...allEdges];
+
+  renderGraph();
+  updateStats();
+  hideLoading();
+  updateStatus("本地示例数据加载完成");
 }
 
 function getSampleData() {
@@ -532,11 +591,29 @@ function renderGraph() {
 
   const chartData = prepareChartData();
 
+  const currentOption = chartInstance.getOption();
+
   chartInstance.setOption({
     series: [
       {
+        layout: currentLayout, // 关键：设置当前布局
         data: chartData.nodes,
         links: chartData.edges,
+        force:
+          currentLayout === "force"
+            ? {
+                repulsion: 300,
+                gravity: 0.1,
+                edgeLength: 100,
+                layoutAnimation: true,
+              }
+            : undefined,
+        circular:
+          currentLayout === "circular"
+            ? {
+                rotateLabel: true,
+              }
+            : undefined,
       },
     ],
   });
@@ -626,6 +703,9 @@ function selectNode(nodeId) {
   if (node) {
     showNodeInfo(node);
     highlightNodeRelations(nodeId);
+
+    // 调用后端获取完整详情
+    fetchNodeDetail(node.name);
   }
 }
 
@@ -734,7 +814,7 @@ function toggleDomainFilter(domain, selected) {
   // 筛选逻辑在 applyFilters 中实现
 }
 
-function applyFilters() {
+async function applyFilters() {
   const checkboxes = document.querySelectorAll(
     '.domain-filter-item input[type="checkbox"]'
   );
@@ -748,12 +828,54 @@ function applyFilters() {
     }
   });
 
-  // 筛选节点
+  if (selectedDomains.length === 0) {
+    // 如果没选任何学科，显示全部
+    currentNodes = [...allNodes];
+    currentEdges = [...allEdges];
+    renderGraph();
+    updateStatus("已显示全部数据");
+    return;
+  }
+
+  showLoading(`正在筛选: ${selectedDomains.join(", ")}`);
+
+  try {
+    // 调用后端多学科筛选接口
+    const queryString = selectedDomains
+      .map((d) => `domains=${encodeURIComponent(d)}`)
+      .join("&");
+    const response = await fetch(
+      `${API_BASE}/api/kg/query/domain/multi?${queryString}`
+    );
+    const result = await response.json();
+
+    if (result && result.nodes) {
+      currentNodes = transformNodes(result.nodes);
+      currentEdges = transformEdges(result.edges || []);
+
+      renderGraph();
+      updateStatus(
+        `已筛选: ${selectedDomains.join(", ")} (${currentNodes.length}个概念)`
+      );
+    } else {
+      updateStatus("筛选未找到数据");
+      fallbackFilter(selectedDomains);
+    }
+  } catch (error) {
+    console.error("筛选失败:", error);
+    updateStatus("筛选失败，使用本地筛选");
+    fallbackFilter(selectedDomains);
+  } finally {
+    hideLoading();
+  }
+}
+
+function fallbackFilter(selectedDomains) {
+  // 前端筛选逻辑（兼容模式）
   currentNodes = allNodes.filter((node) =>
     selectedDomains.includes(node.domain)
   );
 
-  // 筛选边（只保留两端节点都在筛选结果中的边）
   const filteredNodeIds = new Set(currentNodes.map((n) => n.id));
   currentEdges = allEdges.filter(
     (edge) =>
@@ -761,7 +883,7 @@ function applyFilters() {
   );
 
   renderGraph();
-  updateStatus(`已筛选: ${selectedDomains.length} 个学科`);
+  updateStatus(`前端筛选: ${selectedDomains.join(", ")}`);
 }
 
 function selectAllDomains() {
@@ -782,7 +904,7 @@ function clearAllDomains() {
   applyFilters();
 }
 
-function searchConcept() {
+async function searchConcept() {
   const input = document.getElementById("searchInput");
   const keyword = input.value.trim();
 
@@ -791,9 +913,57 @@ function searchConcept() {
     return;
   }
 
+  showLoading(`正在搜索: ${keyword}`);
   updateStatus(`搜索: ${keyword}`);
 
-  // 查找匹配的节点
+  try {
+    // 调用后端搜索接口
+    const response = await fetch(
+      `${API_BASE}/api/kg/query/node/search?keyword=${encodeURIComponent(
+        keyword
+      )}`
+    );
+    const result = await response.json();
+
+    if (result && result.nodes) {
+      // 转换数据格式
+      allNodes = transformNodes(result.nodes);
+      allEdges = transformEdges(result.edges || []);
+
+      currentNodes = [...allNodes];
+      currentEdges = [...allEdges];
+
+      renderGraph();
+
+      // 高亮第一个匹配的节点
+      if (currentNodes.length > 0) {
+        const matchedNode = currentNodes.find((n) =>
+          n.name.toLowerCase().includes(keyword.toLowerCase())
+        );
+        if (matchedNode) {
+          selectNode(matchedNode.id);
+        }
+      }
+
+      updateStatus(`找到 ${currentNodes.length} 个相关概念`);
+    } else {
+      updateStatus("未找到相关概念");
+    }
+  } catch (error) {
+    console.error("搜索失败:", error);
+    updateStatus("搜索失败，请检查网络连接");
+
+    // 本地搜索作为降级方案
+    localSearch(keyword);
+  } finally {
+    hideLoading();
+    input.value = "";
+    input.placeholder = `搜索"${keyword}"的结果`;
+  }
+}
+
+function localSearch(keyword) {
+  // 本地搜索逻辑（降级方案）
   const matchedNodes = allNodes.filter(
     (node) =>
       node.name.toLowerCase().includes(keyword.toLowerCase()) ||
@@ -844,29 +1014,75 @@ function searchConcept() {
     selectNode(matchedNodes[0].id);
   }
 
-  // 更新搜索框提示
-  input.value = "";
-  input.placeholder = `已找到 ${matchedNodes.length} 个相关概念`;
-
-  updateStatus(`找到 ${matchedNodes.length} 个相关概念`);
+  updateStatus(`本地搜索找到 ${matchedNodes.length} 个相关概念`);
 }
 
-function showRandomGraph() {
-  // 随机选择几个学科
-  const domains = Object.keys(DOMAIN_COLORS);
+async function showRandomGraph() {
+  // 从现有学科中随机选择
+  const domains = [...new Set(allNodes.map((n) => n.domain))].filter((d) => d);
+
+  if (domains.length < 2) {
+    updateStatus("数据不足，无法随机探索");
+    return;
+  }
+
+  // 随机选择1-3个学科
+  const randomCount = Math.floor(Math.random() * 3) + 1;
   const randomDomains = [];
 
-  while (randomDomains.length < 3) {
+  while (
+    randomDomains.length < randomCount &&
+    randomDomains.length < domains.length
+  ) {
     const randomDomain = domains[Math.floor(Math.random() * domains.length)];
     if (!randomDomains.includes(randomDomain)) {
       randomDomains.push(randomDomain);
     }
   }
 
-  // 筛选这些学科的节点
+  showLoading(`随机探索: ${randomDomains.join(", ")}`);
+
+  try {
+    // 调用后端多学科筛选接口
+    const queryString = randomDomains
+      .map((d) => `domains=${encodeURIComponent(d)}`)
+      .join("&");
+    const response = await fetch(
+      `${API_BASE}/api/kg/query/domain/multi?${queryString}`
+    );
+    const result = await response.json();
+
+    if (result && result.nodes && result.nodes.length > 0) {
+      currentNodes = transformNodes(result.nodes);
+      currentEdges = transformEdges(result.edges || []);
+
+      renderGraph();
+
+      // 随机选择一个节点高亮
+      if (currentNodes.length > 0) {
+        const randomNode =
+          currentNodes[Math.floor(Math.random() * currentNodes.length)];
+        selectNode(randomNode.id);
+      }
+
+      updateStatus(`随机探索: ${randomDomains.join(", ")}`);
+    } else {
+      updateStatus("随机探索未找到数据");
+      fallbackRandomGraph(randomDomains);
+    }
+  } catch (error) {
+    console.error("随机探索失败:", error);
+    updateStatus("随机探索失败，使用本地数据");
+    fallbackRandomGraph(randomDomains);
+  } finally {
+    hideLoading();
+  }
+}
+
+function fallbackRandomGraph(randomDomains) {
+  // 前端筛选逻辑（兼容模式）
   currentNodes = allNodes.filter((node) => randomDomains.includes(node.domain));
 
-  // 筛选关联的边
   const filteredNodeIds = new Set(currentNodes.map((n) => n.id));
   currentEdges = allEdges.filter(
     (edge) =>
@@ -882,7 +1098,7 @@ function showRandomGraph() {
     selectNode(randomNode.id);
   }
 
-  updateStatus(`随机探索: ${randomDomains.join(", ")}`);
+  updateStatus(`本地随机探索: ${randomDomains.join(", ")}`);
 }
 
 // ============== 视图控制 ==============
@@ -984,6 +1200,25 @@ function showFullscreen() {
 }
 
 // ============== 信息展示 ==============
+async function fetchNodeDetail(nodeName) {
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/kg/query/node/detail?node_name=${encodeURIComponent(
+        nodeName
+      )}`
+    );
+    const result = await response.json();
+
+    if (result && result.node_detail) {
+      // 显示更详细的节点信息
+      showNodeDetail(result);
+    }
+  } catch (error) {
+    console.error("获取节点详情失败:", error);
+    // 使用前端缓存的数据
+  }
+}
+
 function showNodeInfo(node) {
   const infoContainer = document.getElementById("nodeInfo");
   if (!infoContainer) return;
@@ -1103,6 +1338,117 @@ function showNodeInfo(node) {
             }
         </div>
     `;
+}
+
+function showNodeDetail(apiResult) {
+  const node = apiResult.node_detail;
+  const nodes = apiResult.nodes || [];
+  const edges = apiResult.edges || [];
+
+  const infoContainer = document.getElementById("nodeInfo");
+  if (!infoContainer) return;
+
+  // 创建更丰富的详情显示
+  infoContainer.innerHTML = `
+    <div class="node-details">
+        <div class="node-header">
+            <div class="node-title">${node.name}</div>
+            <div class="node-domain" style="background: ${
+              DOMAIN_COLORS[node.domain] || "#94a3b8"
+            }">
+                ${node.domain}
+            </div>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">定义</div>
+                <div class="info-value">${node.definition || "暂无定义"}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">置信度</div>
+                <div class="info-value">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px;">
+                            <div style="width: ${
+                              (node.confidence || 0.8) * 100
+                            }%; height: 100%; 
+                                 background: ${
+                                   node.confidence > 0.8
+                                     ? "#10b981"
+                                     : node.confidence > 0.6
+                                     ? "#f59e0b"
+                                     : "#ef4444"
+                                 }; 
+                                 border-radius: 3px;"></div>
+                        </div>
+                        <span>${Math.round(
+                          (node.confidence || 0.8) * 100
+                        )}%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">关联数量</div>
+                <div class="info-value">${edges.length} 条关联</div>
+            </div>
+        </div>
+        
+        ${
+          edges.length > 0
+            ? `
+        <div class="relations-list">
+            <h4>直接关联</h4>
+            ${edges
+              .slice(0, 5)
+              .map((edge) => {
+                const sourceNode = nodes.find((n) => n.id === edge.source);
+                const targetNode = nodes.find((n) => n.id === edge.target);
+                if (!sourceNode || !targetNode) return "";
+
+                const relationNode =
+                  edge.source === node.id ? targetNode : sourceNode;
+                const direction = edge.source === node.id ? "→" : "←";
+
+                return `
+                <div class="relation-item">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <strong style="color: #1e293b;">${
+                          edge.relation_type || edge.type
+                        }</strong>
+                        <span style="font-size: 12px; color: #64748b;">
+                            ${Math.round((edge.confidence || 0.7) * 100)}%
+                        </span>
+                    </div>
+                    <div style="font-size: 13px; color: #475569;">
+                        ${
+                          edge.source === node.id
+                            ? node.name
+                            : relationNode.name
+                        } 
+                        ${direction} 
+                        ${
+                          edge.source === node.id
+                            ? relationNode.name
+                            : node.name
+                        }
+                    </div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+                        ${edge.relation_desc || ""}
+                    </div>
+                </div>`;
+              })
+              .join("")}
+        </div>
+        `
+            : `
+        <div style="text-align: center; color: #94a3b8; padding: 20px;">
+            暂无关联信息
+        </div>
+        `
+        }
+    </div>
+  `;
 }
 
 function showEdgeInfo(edgeData) {
@@ -1289,6 +1635,35 @@ function focusOnEdge(sourceId, targetId) {
   }, 3000);
 }
 
+// ============== 数据库管理 ==============
+async function clearDatabase() {
+  const confirmed = confirm(
+    "⚠️ 警告：这将清空数据库中的所有数据！\n\n此操作不可撤销，确定继续吗？"
+  );
+
+  if (!confirmed) return;
+
+  showLoading("正在清空数据库...");
+
+  try {
+    const response = await fetch(`${API_BASE}/api/kg/clear/all`);
+    const result = await response.json();
+
+    if (result.status === "success") {
+      // 重新加载数据
+      await loadData();
+      updateStatus("数据库已清空");
+    } else {
+      updateStatus("清空失败: " + result.msg);
+    }
+  } catch (error) {
+    console.error("清空数据库失败:", error);
+    updateStatus("清空失败，请检查后端服务");
+  } finally {
+    hideLoading();
+  }
+}
+
 // ============== 导出功能 ==============
 function exportAsPNG() {
   if (!chartInstance) return;
@@ -1414,7 +1789,7 @@ function updateStatus(message) {
   if (statusEl) {
     statusEl.textContent = message;
 
-    // 3秒后清除状态消息
+    // 5秒后清除状态消息
     setTimeout(() => {
       if (statusEl.textContent === message) {
         statusEl.textContent = "就绪 - 点击节点或连线查看详情";
@@ -1513,7 +1888,9 @@ function showAbout() {
                     <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #475569;">CSS3</span>
                     <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #475569;">JavaScript</span>
                     <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12字; color: #475569;">ECharts</span>
-                    <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #475569;">GitHub Pages</span>
+                    <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #475569;">FastAPI</span>
+                    <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #475569;">Neo4j</span>
+                    <span style="background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #475569;">Docker</span>
                 </div>
             </div>
             

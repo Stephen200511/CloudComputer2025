@@ -1,0 +1,27 @@
+{
+  "name": "knowledge-graph-local",
+  "version": "1.0.0",
+  "description": "跨学科知识图谱可视化系统 - 本地开发版本",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "knowledge-graph",
+    "visualization",
+    "interdisciplinary",
+    "echarts",
+    "frontend"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "echarts": "^5.4.3",
+    "html2canvas": "^1.4.1"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

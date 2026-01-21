@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>跨学科知识图谱可视化系统</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- 顶部导航 -->
+      <header class="header">
+        <div class="logo">
+          <h1>🔗 跨学科知识图谱</h1>
+          <p class="subtitle">探索概念间的跨学科关联</p>
+        </div>
+        <div class="search-bar">
+          <div class="search-input-group">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="输入概念（如：熵、神经网络、博弈论）"
+            />
+            <button onclick="searchConcept()" class="btn-search">
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14z"
+                />
+              </svg>
+              搜索
+            </button>
+            <button onclick="showRandomGraph()" class="btn-random">
+              🎲 随机探索
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- 主内容区 -->
+      <main class="main-content">
+        <!-- 左侧控制面板 -->
+        <aside class="sidebar">
+          <!-- 筛选面板 -->
+          <section class="panel filter-panel">
+            <h3>
+              <svg width="20" height="20" style="margin-right: 8px">
+                <path
+                  fill="#3498db"
+                  d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"
+                /></svg
+              >学科筛选
+            </h3>
+            <div class="domain-filters" id="domainFilters">
+              <!-- 动态生成 -->
+            </div>
+            <div class="filter-actions">
+              <button onclick="selectAllDomains()" class="btn-small">
+                全选
+              </button>
+              <button onclick="clearAllDomains()" class="btn-small">
+                全不选
+              </button>
+              <button onclick="applyFilters()" class="btn-small btn-primary">
+                应用筛选
+              </button>
+            </div>
+          </section>
+
+          <!-- 节点信息面板 -->
+          <section class="panel info-panel">
+            <h3>
+              <svg width="20" height="20" style="margin-right: 8px">
+                <path
+                  fill="#2ecc71"
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                /></svg
+              >概念详情
+            </h3>
+            <div id="nodeInfo" class="node-info">
+              <div class="empty-state">
+                <p>👆 点击图谱中的节点查看详情</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 控制面板 -->
+          <section class="panel control-panel">
+            <h3>
+              <svg width="20" height="20" style="margin-right: 8px">
+                <path
+                  fill="#e74c3c"
+                  d="M12 15c1.66 0 2.99-1.34 2.99-3L15 6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm-1.2-9.1c0-.66.54-1.2 1.2-1.2s1.2.54 1.2 1.2l-.01 6.2c0 .66-.53 1.2-1.19 1.2s-1.2-.54-1.2-1.2V5.9zm6.5 6.1c0 3-2.54 5.1-5.3 5.1S6.7 15 6.7 12H5c0 3.41 2.72 6.23 6 6.72V22h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"
+                /></svg
+              >图谱控制
+            </h3>
+            <div class="controls-grid">
+              <button onclick="zoomIn()" class="control-btn" title="放大">
+                <svg width="16" height="16">
+                  <path fill="white" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
+              </button>
+              <button onclick="zoomOut()" class="control-btn" title="缩小">
+                <svg width="16" height="16">
+                  <path fill="white" d="M19 13H5v-2h14v2z" />
+                </svg>
+              </button>
+              <button onclick="resetView()" class="control-btn" title="复位">
+                <svg width="16" height="16">
+                  <path
+                    fill="white"
+                    d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+                  />
+                </svg>
+              </button>
+              <button
+                onclick="toggleLayout()"
+                class="control-btn"
+                title="切换布局"
+              >
+                <svg width="16" height="16">
+                  <path
+                    fill="white"
+                    d="M4 13h6v-2H4v2zM4 7h12v2H4V7zm0 8h12v2H4v-2z"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div class="slider-group">
+              <label>节点大小：<span id="nodeSizeValue">20</span></label>
+              <input
+                type="range"
+                id="nodeSizeSlider"
+                min="10"
+                max="50"
+                value="20"
+                oninput="updateNodeSize(this.value)"
+              />
+            </div>
+            <div class="slider-group">
+              <label>关联强度：<span id="edgeWidthValue">2</span></label>
+              <input
+                type="range"
+                id="edgeWidthSlider"
+                min="1"
+                max="5"
+                value="2"
+                oninput="updateEdgeWidth(this.value)"
+              />
+            </div>
+          </section>
+
+          <!-- 导出面板 -->
+          <section class="panel export-panel">
+            <h3>
+              <svg width="20" height="20" style="margin-right: 8px">
+                <path
+                  fill="#f39c12"
+                  d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+                /></svg
+              >导出图谱
+            </h3>
+            <div class="export-buttons">
+              <button onclick="exportAsPNG()" class="export-btn">
+                <svg width="16" height="16" style="margin-right: 8px">
+                  <path
+                    fill="currentColor"
+                    d="M13 3H7c-1.1 0-2 .9-2 2v14l5-2.5 5 2.5V5c0-1.1-.9-2-2-2zm0 12l-3-1.5-3 1.5V5h6v10z"
+                  />
+                </svg>
+                导出PNG
+              </button>
+              <button onclick="exportGraphData()" class="export-btn">
+                <svg width="16" height="16" style="margin-right: 8px">
+                  <path
+                    fill="currentColor"
+                    d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"
+                  />
+                </svg>
+                导出JSON
+              </button>
+              <button onclick="shareGraph()" class="export-btn">
+                <svg width="16" height="16" style="margin-right: 8px">
+                  <path
+                    fill="currentColor"
+                    d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"
+                  />
+                </svg>
+                分享链接
+              </button>
+            </div>
+          </section>
+        </aside>
+
+        <!-- 图谱展示区 -->
+        <section class="graph-container">
+          <div class="graph-header">
+            <div class="graph-stats">
+              <span id="nodeCount">0</span> 个概念 •
+              <span id="edgeCount">0</span> 条关联 • 布局:
+              <span id="layoutType">力导向</span>
+            </div>
+            <div class="graph-actions">
+              <button onclick="showFullscreen()" class="btn-icon" title="全屏">
+                <svg width="20" height="20">
+                  <path
+                    fill="currentColor"
+                    d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
+                  />
+                </svg>
+              </button>
+              <button
+                onclick="toggleLabels()"
+                class="btn-icon"
+                title="切换标签"
+              >
+                <svg width="20" height="20">
+                  <path
+                    fill="currentColor"
+                    d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16zM16 17H5V7h11l3.55 5L16 17z"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="graphChart" class="graph-area"></div>
+          <div class="graph-footer">
+            <div class="legend">
+              <div class="legend-item">
+                <span class="legend-color" style="background: #5470c6"></span
+                >数学
+              </div>
+              <div class="legend-item">
+                <span class="legend-color" style="background: #91cc75"></span
+                >物理
+              </div>
+              <div class="legend-item">
+                <span class="legend-color" style="background: #fac858"></span
+                >计算机科学
+              </div>
+              <div class="legend-item">
+                <span class="legend-color" style="background: #ee6666"></span
+                >生物学
+              </div>
+              <div class="legend-item">
+                <span class="legend-color" style="background: #73c0de"></span
+                >社会学
+              </div>
+              <div class="legend-item">
+                <span class="legend-color" style="background: #3ba272"></span
+                >经济学
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- 底部状态栏 -->
+      <footer class="footer">
+        <div class="status-bar">
+          <div id="statusMessage">就绪 - 点击节点或连线查看详情</div>
+          <div
+            class="progress-container"
+            id="loadingProgress"
+            style="display: none"
+          >
+            <div class="progress-bar"></div>
+            <span>加载中...</span>
+          </div>
+        </div>
+        <div class="footer-links">
+          <a href="javascript:void(0)" onclick="showHelp()">帮助</a>
+          <a href="javascript:void(0)" onclick="showAbout()">关于</a>
+          <a href="javascript:void(0)" onclick="toggleTheme()">🌓 主题</a>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 弹窗容器 -->
+    <div id="modal" class="modal" style="display: none">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div id="modalContent"></div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

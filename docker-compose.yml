@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # --- 基础设施层 ---
+  
+  # Neo4j 图数据库
+  neo4j:
+    image: neo4j:5.15.0
+    container_name: kg_neo4j
+    ports:
+      - "7474:7474" # HTTP Browser
+      - "7687:7687" # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/zhangqin123
+    volumes:
+      - ./data/neo4j/data:/data
+      - ./data/neo4j/logs:/logs
+    networks:
+      - kg_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- 后端服务层 ---
+  
+  # ZQ: 后端 API 服务
+  backend:
+    build: 
+      context: ./ZQ
+      dockerfile: Dockerfile
+    container_name: kg_backend
+    ports:
+      - "8001:8001"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=zhangqin123
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - kg_network
+
+  # --- 前端展示层 ---
+  
+  # LDX: 前端 Web 服务
+  frontend:
+    build: 
+      context: ./LDX
+      dockerfile: Dockerfile
+    container_name: kg_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - kg_network
+
+  # --- 智能体层 ---
+  
+  # WY: 跨学科关联挖掘 Agent
+  # 注意：Agent 是按需运行的任务，通常不需要作为常驻服务
+  # 但为了演示，我们可以让它保持运行或作为一次性任务
+  agent:
+    build:
+      context: .
+      dockerfile: WY/Dockerfile
+    container_name: kg_agent
+    environment:
+      # 请确保在项目根目录的 .env 文件中配置了这些密钥
+      - LLM_PROVIDER=${LLM_PROVIDER}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL}
+    volumes:
+      - ./WY:/app/WY # 挂载代码以便开发调试
+      - ./results:/app/results # 挂载结果输出目录
+    networks:
+      - kg_network
+    # 覆盖默认命令，使其保持活跃以便进入容器操作，或者执行特定任务
+    command: tail -f /dev/null 
+
+networks:
+  kg_network:
+    driver: bridge

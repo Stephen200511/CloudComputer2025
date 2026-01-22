@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "concept": "熵",
+    "evidence": {
+      "熵->信息论:定义": [
+        {
+          "title": "A Mathematical Theory of Communication",
+          "authors": "Claude E. Shannon",
+          "year": "1948",
+          "source": "Bell System Technical Journal",
+          "identifier": "arXiv:2107.05013",
+          "url": "https://ieeexplore.ieee.org/document/6773024"
+        },
+        {
+          "title": "Entropy as a Topological Operad Derivation",
+          "summary": "We share a small connection between information theory, algebra, and topology - namely, a correspondence between Shannon entropy and derivations of the operad of topological simplices. We begin with a",
+          "url": "https://arxiv.org/pdf/2107.09581v2",
+          "authors": "Tai-Danae Bradley",
+          "verification_reason": "摘要明确将香农熵（信息论中的核心概念）与拓扑单纯形的operad的推导联系起来，建立了信息论与代数、拓扑之间的对应关系，直接支持了熵在信息论中定义的主张。"
+        },
+        {
+          "title": "Rényi Entropy Power Inequalities via Normal Transport and Rotation",
+          "summary": "Following a recent proof of Shannon's entropy power inequality (EPI), a comprehensive framework for deriving various EPIs for the Rényi entropy is presented that uses transport arguments from normal d",
+          "url": "https://arxiv.org/pdf/1807.02622v2",
+          "authors": "Olivier Rioul",
+          "verification_reason": "摘要明确提到'Shannon's entropy power inequality'，这是信息论中的核心概念，且论文主题Rényi熵是信息论中熵概念的推广，因此摘要内容间接支持熵在信息论中的定义和应用。"
+        },
+        {
+          "title": "An Extended Result on the Optimal Estimation under Minimum Error Entropy Criterion",
+          "summary": "The minimum error entropy (MEE) criterion has been successfully used in fields such as parameter estimation, system identification and the supervised machine learning. There is in general no explicit ",
+          "url": "https://arxiv.org/pdf/1401.6294v1",
+          "authors": "Badong Chen, Guangmin Wang, Nanning Zheng, Jose C. Principe",
+          "verification_reason": "摘要中明确将'熵'与'信息论'领域的关键概念'最小误差熵准则'联系起来，该准则是信息论在参数估计、系统识别和机器学习中的具体应用，直接支持熵在信息论中的定义和用途。"
+        }
+      ],
+      "熵->热力学:从属": [
+        {
+          "title": "Thermodynamics and Statistical Mechanics",
+          "authors": "R. K. Pathria",
+          "year": "1996",
+          "source": "Academic references",
+          "identifier": "",
+          "url": ""
+        },
+        {
+          "title": "Thermodynamics of low-dimensional trapped Fermi gases",
+          "summary": "The effects of low dimensionality on the thermodynamics of a Fermi gas trapped by isotropic power law potentials are analyzed. Particular attention is given to different characteristic temperatures th",
+          "url": "https://arxiv.org/pdf/1612.02496v1",
+          "authors": "Francisco J. Sevilla",
+          "verification_reason": "摘要明确将热力学（thermodynamics）作为核心研究框架，分析费米气体的热力学性质，而熵是热力学的基本概念之一。论文标题和摘要均围绕热力学展开，因此间接支持熵从属于热力学的关联主张。"
+        },
+        {
+          "title": "On entropy in eulerian thermodynamics",
+          "summary": "To the student of thermodynamics the most difficult subject is entropy. In this paper we examine the actual, practical application of entropy to two simple systems, the homogeneous slab with fixed bou",
+          "url": "https://arxiv.org/pdf/1106.2273v1",
+          "authors": "Christian Frønsdal, Abhishek Pathak",
+          "verification_reason": "摘要明确指出论文研究熵在热力学中的实际应用，标题和摘要都明确将熵置于热力学框架内讨论，直接支持熵从属于热力学的主张。"
+        },
+        {
+          "title": "Corrections to Bekenstein-Hawking entropy --- Quantum or not-so quantum?",
+          "summary": "Hawking radiation and Bekenstein--Hawking entropy are the two robust predictions of a yet unknown quantum theory of gravity. Any theory which fails to reproduce these predictions is certainly incorrec",
+          "url": "https://arxiv.org/pdf/1101.0030v1",
+          "authors": "S. Shankaranarayanan",
+          "verification_reason": "摘要明确将Bekenstein-Hawking熵作为量子引力理论的关键预测，而热力学是熵概念的基础理论框架，因此熵（特别是Bekenstein-Hawking熵）被置于热力学语境中讨论，间接支持了熵从属于热力学的关联主张。"
+        }
+      ]
+    },
+    "no_association": []
+  },
+  "nodes": [
+    {
+      "node_id": "熵",
+      "name": "熵",
+      "domain": "",
+      "definition": "",
+      "confidence": 1.0
+    },
+    {
+      "node_id": "信息论",
+      "name": "信息论",
+      "domain": "数学",
+      "definition": "信息论中熵刻画不确定性与平均信息量。",
+      "confidence": 1.0
+    },
+    {
+      "node_id": "热力学",
+      "name": "热力学",
+      "domain": "物理",
+      "definition": "热力学熵度量微观态数与宏观无序。",
+      "confidence": 1.0
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "熵->信息论:定义",
+      "source_node_id": "熵",
+      "target_node_id": "信息论",
+      "relation_type": "定义",
+      "relation_desc": "信息论中熵刻画不确定性与平均信息量。",
+      "confidence": 1.0
+    },
+    {
+      "edge_id": "熵->热力学:从属",
+      "source_node_id": "熵",
+      "target_node_id": "热力学",
+      "relation_type": "从属",
+      "relation_desc": "热力学熵度量微观态数与宏观无序。",
+      "confidence": 1.0
+    }
+  ]
+}

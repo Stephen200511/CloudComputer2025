@@ -1,0 +1,119 @@
+{
+  "meta": {
+    "concept": "熵",
+    "evidence": {
+      "熵->信息熵:定义": [
+        {
+          "title": "A Mathematical Theory of Communication",
+          "authors": "Claude E. Shannon",
+          "year": "1948",
+          "source": "Bell System Technical Journal",
+          "identifier": "10.1002/j.1538-7305.1948.tb01338.x",
+          "url": "https://doi.org/10.1002/j.1538-7305.1948.tb01338.x"
+        }
+      ],
+      "熵->热力学第二定律:因果": [
+        {
+          "title": "Thermodynamics and an Introduction to Thermostatistics",
+          "authors": "Herbert B. Callen",
+          "year": "1985",
+          "source": "John Wiley & Sons",
+          "identifier": "ISBN 0-471-86256-8",
+          "url": ""
+        }
+      ],
+      "熵->社会熵:类比": [
+        {
+          "title": "Social Entropy Theory",
+          "authors": "Kenneth D. Bailey",
+          "year": "1990",
+          "source": "State University of New York Press",
+          "identifier": "ISBN 0-7914-0271-9",
+          "url": ""
+        }
+      ],
+      "熵->生物信息熵:应用": [
+        {
+          "title": "Information Theory and Evolution",
+          "authors": "John S. Avery",
+          "year": "2012",
+          "source": "World Scientific",
+          "identifier": "ISBN 978-981-4401-99-9",
+          "url": ""
+        }
+      ]
+    },
+    "no_association": []
+  },
+  "nodes": [
+    {
+      "node_id": "熵",
+      "name": "熵",
+      "domain": "",
+      "definition": "",
+      "confidence": 1.0
+    },
+    {
+      "node_id": "信息熵",
+      "name": "信息熵",
+      "domain": "数学",
+      "definition": "熵在数学中通过信息论被形式化为信息熵，量化随机变量的不确定性或信息量。",
+      "confidence": 0.8
+    },
+    {
+      "node_id": "热力学第二定律",
+      "name": "热力学第二定律",
+      "domain": "物理",
+      "definition": "熵在热力学中定义为系统无序度的度量，热力学第二定律指出孤立系统的熵永不减少，驱动自然过程的不可逆性。",
+      "confidence": 0.8
+    },
+    {
+      "node_id": "社会熵",
+      "name": "社会熵",
+      "domain": "社会学",
+      "definition": "社会熵类比热力学熵，用于描述社会系统的无序度、混乱或信息过载，如在社会网络分析中量化不确定性。",
+      "confidence": 0.8
+    },
+    {
+      "node_id": "生物信息熵",
+      "name": "生物信息熵",
+      "domain": "生物学",
+      "definition": "熵应用于生物学，如通过信息熵分析DNA序列的复杂性、物种多样性或生态系统稳定性。",
+      "confidence": 0.8
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "熵->信息熵:定义",
+      "source_node_id": "熵",
+      "target_node_id": "信息熵",
+      "relation_type": "定义",
+      "relation_desc": "熵在数学中通过信息论被形式化为信息熵，量化随机变量的不确定性或信息量。",
+      "confidence": 0.8
+    },
+    {
+      "edge_id": "熵->热力学第二定律:因果",
+      "source_node_id": "熵",
+      "target_node_id": "热力学第二定律",
+      "relation_type": "因果",
+      "relation_desc": "熵在热力学中定义为系统无序度的度量，热力学第二定律指出孤立系统的熵永不减少，驱动自然过程的不可逆性。",
+      "confidence": 0.8
+    },
+    {
+      "edge_id": "熵->社会熵:类比",
+      "source_node_id": "熵",
+      "target_node_id": "社会熵",
+      "relation_type": "类比",
+      "relation_desc": "社会熵类比热力学熵，用于描述社会系统的无序度、混乱或信息过载，如在社会网络分析中量化不确定性。",
+      "confidence": 0.8
+    },
+    {
+      "edge_id": "熵->生物信息熵:应用",
+      "source_node_id": "熵",
+      "target_node_id": "生物信息熵",
+      "relation_type": "应用",
+      "relation_desc": "熵应用于生物学，如通过信息熵分析DNA序列的复杂性、物种多样性或生态系统稳定性。",
+      "confidence": 0.8
+    }
+  ]
+}

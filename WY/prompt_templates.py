@@ -13,9 +13,23 @@ def cross_domain_prompt(concept: str, disciplines: list = None) -> str:
         "5. 若某学科无合理关联，给出“暂无关联”，并推荐3个基础/邻近概念。"
         "6. 请以 JSON 格式输出结果。"
         "结构化草案：{"
-        '"concept":"{concept}","associations":[{"discipline":"","target_concept":"","relation_type":"","explanation":"","evidence":[{"title":"","authors":"","year":"","source":"","identifier":"","url":""}]}],'
+        '"concept":"{concept}",'
+        '"associations":[{"discipline":"","target_concept":"","definition":"概念定义","relation_type":"","explanation":"","confidence":0.9,"evidence":[{"title":"","authors":"","year":"","source":"","identifier":"","url":""}]}],'
         '"no_association":[{"discipline":"","message":"暂无关联","suggestions":["","",""]}]'
         "}"
+    )
+
+def verification_prompt(claim: str, title: str, summary: str) -> str:
+    return (
+        "角色：你是学术论文评审专家。\n"
+        f"任务：验证论文是否支持该关联主张。\n"
+        f"主张：{claim}\n"
+        f"论文标题：{title}\n"
+        f"论文摘要：{summary}\n"
+        "要求：\n"
+        "1. 判断摘要内容是否直接或间接支持该主张。\n"
+        "2. 以 JSON 格式输出：{\"support\": true/false, \"reason\": \"简要理由\"}\n"
+        "3. 如果摘要无关或仅提到关键词但未建立联系，返回 false。"
     )
 
 KNOWN = {
@@ -93,5 +107,6 @@ ALIASES = {
     "熵": ["entropy"],
     "信息论": ["information theory"],
     "最小二乘法": ["least squares", "least-squares"],
-    "线性回归": ["linear regression"]
+    "线性回归": ["linear regression"],
+    "热力学": ["thermodynamics"]
 }

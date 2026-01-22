@@ -124,13 +124,21 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="跨学科知识图谱-后端接口", version="1.0", docs_url="/docs")
 app.add_middleware(
     CORSMiddleware,
-    # 开发时允许所有来源，便于本地前端（如 server.js:3000）访问。
+    # 开发时允许所有来源，便于本地前端
     # 生产环境请限定具体域名以保证安全。
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],  # 允许所有请求方法（GET/POST等）
     allow_headers=["*"],  # 允许所有请求头
 )
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "zq-backend",
+        "neo4j_conn": "ok"  # 可选：简单检测Neo4j连接
+    }
 
 # 接收前端传的result数据，校验后入库Neo4j
 @app.post("/api/kg/insert/from-front", summary="前端传入图谱数据并入库")

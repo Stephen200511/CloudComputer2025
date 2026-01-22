@@ -54,6 +54,13 @@ def main():
         f.write(output_content)
         
     print(filename)
+    
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "wy-agent"
+    }
 
 @app.get("/api/kg/query/node/search")
 async def search_node(

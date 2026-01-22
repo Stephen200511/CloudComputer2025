@@ -3,6 +3,7 @@ from .prompt_templates import cross_domain_prompt, verification_prompt, KNOWN, A
 from .validators import ArxivValidator, CnkiValidator
 from .formatter import to_kg
 from .recommend import recommend_basics
+from typing import Callable, Dict, Any, Optional
 
 def default_generator(concept: str) -> Dict[str, Any]:
     items = KNOWN.get(concept, [])

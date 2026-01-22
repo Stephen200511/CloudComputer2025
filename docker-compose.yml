@@ -1,87 +1,118 @@
-version: '3.8'
+# 全局自定义网络：所有服务在同一个网络，可通过容器名通信
+networks:
+  kg_network:
+    driver: bridge
+
+# 全局数据卷：持久化Neo4j数据、智能体结果、前端日志
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  wy_results:
+  frontend_logs:
 
 services:
-  # --- 基础设施层 ---
-  
-  # Neo4j 图数据库
+  # ========== 基础设施层：Neo4j 数据库 ==========
   neo4j:
     image: neo4j:5.15.0
     container_name: kg_neo4j
     ports:
-      - "7474:7474" # HTTP Browser
-      - "7687:7687" # Bolt
+      - "7474:7474"  # HTTP管理界面（主机访问）
+      - "7687:7687"  # Bolt协议（容器内通信核心）
     environment:
       - NEO4J_AUTH=neo4j/zhangqin123
+      - NEO4J_server_http_enabled=true  # 关闭无效配置，避免启动报错
     volumes:
-      - ./data/neo4j/data:/data
-      - ./data/neo4j/logs:/logs
+      - neo4j_data:/data
+      - neo4j_logs:/logs
     networks:
       - kg_network
+    restart: unless-stopped
+    # 关键：用cypher-shell检查Bolt端口（7474起来≠Bolt就绪）
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
+      test: ["CMD", "cypher-shell", "--uri", "bolt://localhost:7687", "-u", "neo4j", "-p", "zhangqin123", "RETURN 1;"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s  # Neo4j首次启动需要时间
 
-  # --- 后端服务层 ---
-  
-  # ZQ: 后端 API 服务
-  backend:
-    build: 
+  # ========== 后端服务层：ZQ 后端（Neo4j接口） ==========
+  zq-backend:
+    build:
       context: ./ZQ
       dockerfile: Dockerfile
-    container_name: kg_backend
+    container_name: kg_zq_backend
     ports:
-      - "8001:8001"
+      - "8001:8000"       # 主机8001 → 容器8000（ZQ代码内端口是8000）
     environment:
-      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_URI=bolt://neo4j:7687  # 容器内访问Neo4j（服务名+容器端口）
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=zhangqin123
     depends_on:
       neo4j:
-        condition: service_healthy
+        condition: service_healthy   # 确保Neo4j就绪后启动
     networks:
       - kg_network
+    restart: unless-stopped
+    # 健康检查：确保ZQ后端服务就绪（替换为你的健康接口，无则注释）
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
-  # --- 前端展示层 ---
-  
-  # LDX: 前端 Web 服务
-  frontend:
-    build: 
-      context: ./LDX
-      dockerfile: Dockerfile
-    container_name: kg_frontend
-    ports:
-      - "8080:80"
-    depends_on:
-      - backend
-    networks:
-      - kg_network
-
-  # --- 智能体层 ---
-  
-  # WY: 跨学科关联挖掘 Agent
-  # 注意：Agent 是按需运行的任务，通常不需要作为常驻服务
-  # 但为了演示，我们可以让它保持运行或作为一次性任务
-  agent:
+  # ========== 智能体层：WY 跨学科关联挖掘 Agent ==========
+  wy-agent:
     build:
-      context: .
-      dockerfile: WY/Dockerfile
-    container_name: kg_agent
-    environment:
-      # 请确保在项目根目录的 .env 文件中配置了这些密钥
-      - LLM_PROVIDER=${LLM_PROVIDER}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL}
-      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL}
+      context: ./WY
+      dockerfile: Dockerfile
+    container_name: kg_wy_agent
+    ports:
+      - "8000:8000"
     volumes:
-      - ./WY:/app/WY # 挂载代码以便开发调试
-      - ./results:/app/results # 挂载结果输出目录
+      - wy_results:/app/results
+      - ./WY:/app/WY
     networks:
       - kg_network
-    # 覆盖默认命令，使其保持活跃以便进入容器操作，或者执行特定任务
-    command: tail -f /dev/null 
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["python", "-m", "WY.cli"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-H", "Host: localhost:8000", "-H", "User-Agent: curl/7.74.0", "http://localhost:8000/health"]
+      interval: 10s        # 加快检查频率
+      timeout: 10s         # 延长超时
+      retries: 2           # 减少重试次数
+      start_period: 20s    # 缩短启动等待
 
-networks:
-  kg_network:
-    driver: bridge
+  # ========== 前端展示层：LDX 前端 ==========
+  ldx-frontend:
+    build:
+      context: ./LDX  
+      dockerfile: Dockerfile
+    container_name: kg_ldx_frontend
+    ports:
+      - "8080:3000"  # 若前端是Node.js服务（容器内端口3000），替换为：- "8080:3000"
+    environment:
+      # 前端访问后端：用「容器名+容器端口」（同一网络内通信）
+      - API_BASE_URL=http://zq-backend:8000       # 访问ZQ后端（容器内端口）
+      - API_BASE2_URL=http://wy-agent:8000        # 访问WY智能体（容器内端口）
+      - NODE_ENV=production
+    volumes:
+      - frontend_logs:/app/logs  # 持久化前端日志
+    networks:
+      - kg_network
+    depends_on:
+      zq-backend:
+        condition: service_healthy  # 等待ZQ后端就绪
+      wy-agent:
+        condition: service_healthy  # 等待WY智能体就绪
+    restart: unless-stopped
+    # 健康检查：确保前端服务就绪
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

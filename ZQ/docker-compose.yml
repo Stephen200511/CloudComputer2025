@@ -1,41 +1,41 @@
-version: '3.8'
-
 services:
-  # FastAPI服务（命名为kg-backend）
-  kg-backend:
-    build: .  # 基于当前文件夹的Dockerfile构建镜像
-    container_name: kg-backend
+  zq-api:
+    build: .
+    container_name: zq-api
     ports:
-      - "8000:8000"  # 本地8000端口 → 容器8000端口
+      - "8001:8000"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=zhangqin123
     depends_on:
-      - neo4j  # 先启动Neo4j，再启动FastAPI
-    networks:
-      - kg-network
+      neo4j:
+        condition: service_healthy
     restart: always
 
-  # Neo4j数据库服务
   neo4j:
-    image: neo4j:5.15.0  # 稳定版镜像
+    image: neo4j:5.15.0
     container_name: neo4j
     ports:
-      - "7474:7474"  # Neo4j网页端
-      - "7687:7687"  # Neo4j bolt协议端口
+      - "7474:7474"
+      - "7687:7687"
     environment:
-      - NEO4J_AUTH=neo4j/zhangqin123  # 和你代码里的密码一致
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
-      - NEO4J_dbms_memory_heap_initial_size=512m
-      - NEO4J_dbms_memory_heap_max_size=1G
+      - NEO4J_AUTH=neo4j/zhangqin123
+      # 移除了无效的 server.config.strict.validation.enabled 配置
+      # 保留必要的Bolt连接器配置，确保容器内访问正常
+      - NEO4J_dbms_connector_bolt_advertised__address=neo4j:7687
+      - NEO4J_dbms_connector_bolt_listen__address=0.0.0.0:7687
+      - NEO4J_server_http_enabled=true
     volumes:
-      - neo4j-data:/data  # 持久化数据（本地测试也保留）
-    networks:
-      - kg-network
+      - neo4j-data:/data
     restart: always
+    healthcheck:
+      # 健壮的健康检查命令
+      test: ["CMD", "cypher-shell", "--uri", "bolt://localhost:7687", "-u", "neo4j", "-p", "zhangqin123", "-d", "neo4j", "--format", "plain", "RETURN 1 AS health_check;"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s  # 给足neo4j首次启动的初始化时间
 
-# 自定义网络（让两个容器互通）
-networks:
-  kg-network:
-    driver: bridge
-
-# 数据卷（保存Neo4j数据）
 volumes:
   neo4j-data:

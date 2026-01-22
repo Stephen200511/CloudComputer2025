@@ -9,8 +9,8 @@ from fastapi import Query
 from fastapi import Request 
 
 # Neo4j数据库连接配置
-# NEO4J_URI = "bolt://neo4j:7687"
-NEO4J_URI = "bolt://localhost:7687"  # Docker部署后改成bolt://neo4j:7687
+NEO4J_URI = "bolt://neo4j:7687"
+# NEO4J_URI = "bolt://localhost:7687"  # Docker部署后改成bolt://neo4j:7687
 NEO4J_USER = "neo4j"
 NEO4J_PASSWORD = "zhangqin123"
 driver = GraphDatabase.driver(NEO4J_URI, auth=basic_auth(NEO4J_USER, NEO4J_PASSWORD))

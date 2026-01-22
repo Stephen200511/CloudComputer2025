@@ -1,0 +1,95 @@
+# docker-compose.yml
+version: "3.8"
+
+services:
+  # 前端服务
+  frontend:
+    build: .
+    container_name: kg-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - API_BASE_URL=http://kg-backend:8000
+      - API_BASE2_URL=http://kg-backend2:8001
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - kg-network
+
+  # 后端服务1 (假设在端口8000)
+  kg-backend:
+    image: your-backend-image:latest
+    container_name: kg-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - NEO4J_URI=bolt://kg-neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+    networks:
+      - kg-network
+    depends_on:
+      - kg-neo4j
+    restart: unless-stopped
+
+  # 后端服务2 (假设在端口8001)
+  kg-backend2:
+    image: your-backend2-image:latest
+    container_name: kg-backend2
+    ports:
+      - "8001:8001"
+    environment:
+      - NEO4J_URI=bolt://kg-neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password
+    networks:
+      - kg-network
+    depends_on:
+      - kg-neo4j
+    restart: unless-stopped
+
+  # Neo4j 数据库
+  kg-neo4j:
+    image: neo4j:5.16.0-community
+    container_name: kg-neo4j
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    networks:
+      - kg-network
+    restart: unless-stopped
+
+networks:
+  kg-network:
+    driver: bridge
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_plugins:

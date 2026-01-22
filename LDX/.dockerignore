@@ -1,0 +1,14 @@
+# .dockerignore
+node_modules
+npm-debug.log
+.DS_Store
+.git
+.gitignore
+.vscode
+.env
+*.md
+logs/
+temp/
+dist/
+coverage/
+docker-compose.override.yml

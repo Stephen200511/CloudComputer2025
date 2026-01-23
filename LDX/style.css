@@ -96,6 +96,15 @@ body {
   transition: all 0.3s ease;
 }
 
+.btn-random[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-random[disabled]:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .btn-search {
   background: linear-gradient(90deg, #3b82f6, #6366f1);
   color: white;

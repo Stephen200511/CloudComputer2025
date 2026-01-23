@@ -9,8 +9,11 @@ let currentEdges = [];
 let nodeSize = 20;
 let edgeWidth = 2;
 let selectedNodeId = null;
-const API_BASE = "http://localhost:8000"; // 后端地址
+const API_BASE = "http://localhost:8001"; // 后端地址
 const API_BASE2= "http://localhost:8001"; // 后端地址
+
+let bootstrapReady = false;
+let bootstrapPollTimer = null;
 
 /* 
 // 关键修改：从环境变量获取API地址，支持容器化
@@ -72,6 +75,9 @@ function initApp() {
   // 加载数据
   loadData();
 
+  // 启动初始化状态轮询
+  startBootstrapPolling();
+
   // 绑定事件
   bindEvents();
 
@@ -79,6 +85,83 @@ function initApp() {
   updateStatus("应用已就绪");
 
   console.log("应用初始化完成");
+}
+
+function setRandomExploreEnabled(enabled) {
+  const btn = document.getElementById("randomExploreBtn");
+  if (!btn) return;
+  if (enabled) {
+    btn.removeAttribute("disabled");
+  } else {
+    btn.setAttribute("disabled", "disabled");
+  }
+}
+
+async function fetchBootstrapStatus() {
+  try {
+    const res = await fetch(`${API_BASE2}/api/kg/bootstrap/status`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+async function startBootstrapPolling() {
+  setRandomExploreEnabled(false);
+
+  let triggered = false;
+  let lastNodes = -1;
+  let lastEdges = -1;
+
+  const tick = async () => {
+    const s = await fetchBootstrapStatus();
+    if (!s) return;
+
+    const nodes = s?.counts?.nodes ?? 0;
+    const edges = s?.counts?.edges ?? 0;
+    const minNodes = s?.target?.min_nodes ?? 0;
+    const minEdges = s?.target?.min_edges ?? 0;
+    const ready = Boolean(s?.ready);
+    const status = s?.progress?.status || "";
+    const inProgress = Boolean(s?.progress?.in_progress);
+
+    bootstrapReady = ready;
+    setRandomExploreEnabled(ready);
+
+    if (!ready) {
+      if (!inProgress && !triggered) {
+        triggered = true;
+        try {
+          await fetch(`${API_BASE2}/api/kg/bootstrap/trigger`, { method: "POST" });
+        } catch {}
+      }
+      const msg = `正在初始化图谱: ${nodes}/${minNodes} 节点, ${edges}/${minEdges} 关联`;
+      showLoading(status ? `${msg}（${status}）` : msg);
+      updateStatus(status ? `${msg}（${status}）` : msg);
+    } else {
+      hideLoading();
+      updateStatus(`图谱已就绪: ${nodes} 个概念, ${edges} 条关联`);
+    }
+
+    if (nodes !== lastNodes || edges !== lastEdges) {
+      lastNodes = nodes;
+      lastEdges = edges;
+      if (nodes > 0) {
+        loadData();
+      }
+    }
+
+    if (ready && bootstrapPollTimer) {
+      clearInterval(bootstrapPollTimer);
+      bootstrapPollTimer = null;
+    }
+  };
+
+  await tick();
+  if (!bootstrapPollTimer) {
+    bootstrapPollTimer = setInterval(tick, 3000);
+  }
 }
 
 function initChart() {
@@ -273,21 +356,28 @@ async function loadData() {
       currentNodes = [...allNodes];
       currentEdges = [...allEdges];
 
-      Graph();
+      renderGraph();
       updateStats();
       hideLoading();
       updateStatus(
         `数据加载完成: ${allNodes.length}个节点, ${allEdges.length}条边`
       );
+
+      if (result?.meta?.type && String(result.meta.type).includes("初始化中")) {
+        setTimeout(() => {
+          loadData();
+        }, 3000);
+      }
     } else {
-      // 如果后端没数据，使用示例数据
-      console.warn("后端暂无数据，使用示例数据");
-      loadSampleData();
+      // 如果后端没数据，提示用户
+      console.warn("后端暂无数据");
+      updateStatus("后端暂无数据，请先生成图谱");
+      hideLoading();
     }
   } catch (error) {
     console.error("API调用失败:", error);
-    updateStatus("后端连接失败，使用本地示例数据");
-    loadSampleData();
+    updateStatus("后端连接失败，请检查服务状态");
+    hideLoading();
   }
 }
 
@@ -321,290 +411,7 @@ function transformEdges(apiEdges) {
   }));
 }
 
-function loadSampleData() {
-  const sampleData = getSampleData();
-  allNodes = sampleData.nodes;
-  allEdges = sampleData.edges;
-  currentNodes = [...allNodes];
-  currentEdges = [...allEdges];
-  
-  renderGraph();
-  updateStats();
-  hideLoading();
-  updateStatus("本地示例数据加载完成");
-}
 
-function getSampleData() {
-  return {
-nodes: [
-      // 数学相关
-      {
-        id: "math_1",
-        name: "集合论",
-        domain: "数学",
-        definition: "研究集合及其性质的数学分支",
-        confidence: 0.95,
-      },
-      {
-        id: "math_2",
-        name: "概率论",
-        domain: "数学",
-        definition: "研究随机现象数量规律的数学分支",
-        confidence: 0.96,
-      },
-      {
-        id: "math_3",
-        name: "微积分",
-        domain: "数学",
-        definition: "研究变化和积分的数学分支",
-        confidence: 0.98,
-      },
-      {
-        id: "math_4",
-        name: "线性代数",
-        domain: "数学",
-        definition: "研究向量空间和线性映射的数学分支",
-        confidence: 0.97,
-      },
-
-      // 物理相关
-      {
-        id: "phy_1",
-        name: "牛顿力学",
-        domain: "物理",
-        definition: "经典力学的基础理论",
-        confidence: 0.99,
-      },
-      {
-        id: "phy_2",
-        name: "热力学",
-        domain: "物理",
-        definition: "研究热现象的物理学分支",
-        confidence: 0.96,
-      },
-      {
-        id: "phy_3",
-        name: "量子力学",
-        domain: "物理",
-        definition: "描述微观粒子行为的物理学理论",
-        confidence: 0.94,
-      },
-      {
-        id: "phy_4",
-        name: "相对论",
-        domain: "物理",
-        definition: "爱因斯坦提出的时空理论",
-        confidence: 0.93,
-      },
-
-      // 计算机科学相关
-      {
-        id: "cs_1",
-        name: "算法",
-        domain: "计算机科学",
-        definition: "解决问题的明确步骤",
-        confidence: 0.97,
-      },
-      {
-        id: "cs_2",
-        name: "数据结构",
-        domain: "计算机科学",
-        definition: "数据的组织、管理和存储格式",
-        confidence: 0.96,
-      },
-      {
-        id: "cs_3",
-        name: "机器学习",
-        domain: "计算机科学",
-        definition: "让计算机从数据中学习的技术",
-        confidence: 0.92,
-      },
-      {
-        id: "cs_4",
-        name: "神经网络",
-        domain: "计算机科学",
-        definition: "模拟人脑神经元的计算模型",
-        confidence: 0.91,
-      },
-
-      // 信息论相关
-      {
-        id: "info_1",
-        name: "信息熵",
-        domain: "信息论",
-        definition: "信息不确定性的度量",
-        confidence: 0.95,
-      },
-      {
-        id: "info_2",
-        name: "香农定理",
-        domain: "信息论",
-        definition: "信道容量的计算公式",
-        confidence: 0.93,
-      },
-      {
-        id: "info_3",
-        name: "编码理论",
-        domain: "信息论",
-        definition: "研究信息编码和传输的理论",
-        confidence: 0.92,
-      },
-
-      // 跨学科概念
-      {
-        id: "cross_1",
-        name: "熵",
-        domain: "物理",
-        definition: "热力学中表征物质状态的参量",
-        confidence: 0.95,
-      },
-      {
-        id: "cross_2",
-        name: "熵",
-        domain: "信息论",
-        definition: "信息不确定性的度量",
-        confidence: 0.92,
-      },
-      {
-        id: "cross_3",
-        name: "优化",
-        domain: "数学",
-        definition: "寻找最佳解决方案的过程",
-        confidence: 0.94,
-      },
-      {
-        id: "cross_4",
-        name: "优化算法",
-        domain: "计算机科学",
-        definition: "解决优化问题的计算方法",
-        confidence: 0.91,
-      },
-
-      // 其他学科
-      {
-        id: "bio_1",
-        name: "进化论",
-        domain: "生物学",
-        definition: "生物种群特征随时间变化的理论",
-        confidence: 0.97,
-      },
-      {
-        id: "eco_1",
-        name: "博弈论",
-        domain: "经济学",
-        definition: "研究策略互动的数学理论",
-        confidence: 0.94,
-      },
-      {
-        id: "soc_1",
-        name: "社会网络",
-        domain: "社会学",
-        definition: "社会实体间关系的集合",
-        confidence: 0.89,
-      },
-    ],
-    edges: [
-      // 数学内部关联
-      {
-        source: "math_1",
-        target: "math_2",
-        relation_type: "基础",
-        relation_desc: "概率论建立在集合论基础上",
-        confidence: 0.85,
-      },
-      {
-        source: "math_3",
-        target: "math_2",
-        relation_type: "工具",
-        relation_desc: "微积分是概率论的重要工具",
-        confidence: 0.82,
-      },
-
-      // 物理内部关联
-      {
-        source: "phy_1",
-        target: "phy_2",
-        relation_type: "应用",
-        relation_desc: "牛顿力学应用于热力学研究",
-        confidence: 0.78,
-      },
-      {
-        source: "phy_3",
-        target: "phy_4",
-        relation_type: "互补",
-        relation_desc: "量子力学与相对论是现代物理两大支柱",
-        confidence: 0.75,
-      },
-
-      // 计算机科学内部关联
-      {
-        source: "cs_1",
-        target: "cs_2",
-        relation_type: "依赖",
-        relation_desc: "算法效率依赖于数据结构",
-        confidence: 0.92,
-      },
-      {
-        source: "cs_3",
-        target: "cs_4",
-        relation_type: "包含",
-        relation_desc: "神经网络是机器学习的重要分支",
-        confidence: 0.88,
-      },
-
-      // 跨学科关联
-      {
-        source: "cross_1",
-        target: "cross_2",
-        relation_type: "类比",
-        relation_desc: "热力学熵与信息熵的数学形式相似",
-        confidence: 0.82,
-      },
-      {
-        source: "cross_3",
-        target: "cross_4",
-        relation_type: "应用",
-        relation_desc: "数学优化理论应用于计算机算法设计",
-        confidence: 0.86,
-      },
-      {
-        source: "math_2",
-        target: "info_1",
-        relation_type: "基础",
-        relation_desc: "信息熵基于概率论定义",
-        confidence: 0.91,
-      },
-      {
-        source: "phy_3",
-        target: "cs_4",
-        relation_type: "启发",
-        relation_desc: "量子力学启发了量子神经网络研究",
-        confidence: 0.72,
-      },
-      {
-        source: "bio_1",
-        target: "cs_3",
-        relation_type: "启发",
-        relation_desc: "进化论启发了遗传算法设计",
-        confidence: 0.68,
-      },
-      {
-        source: "eco_1",
-        target: "cs_3",
-        relation_type: "应用",
-        relation_desc: "博弈论应用于多智能体系统研究",
-        confidence: 0.76,
-      },
-      {
-        source: "soc_1",
-        target: "cs_4",
-        relation_type: "类比",
-        relation_desc: "社会网络与神经网络结构的相似性",
-        confidence: 0.65,
-      },
-    ],
-  };
-}
 // ============== 图谱渲染 ==============
 function renderGraph() {
   if (!chartInstance) return;
@@ -942,61 +749,24 @@ async function searchConcept() {
   updateStatus(`搜索: ${keyword}`);
 
   try {
-    // 调用后端搜索接口
-    const response = await fetch(
-      `${API_BASE}/api/kg/query/node/search?keyword=${encodeURIComponent(
-        keyword
-      )}`
-    );
+    const response = await fetch(`${API_BASE2}/api/kg/query/node/search_or_ingest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword: keyword, auto_ingest: true }),
+    });
+    if (!response.ok) {
+      throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+    }
     const result = await response.json();
     console.log("后端返回的完整数据：", result);
     
-    const pureResult = JSON.parse(result); //
     // 提取nodes/edges
-    const nodes = pureResult.nodes || [];
-    const edges = pureResult.edges || [];
+    const nodes = result.nodes || [];
+    const edges = result.edges || [];
     // 打印验证
     // console.log("节点列表：", JSON.stringify(nodes, null, 2));
     // console.log("边列表：", JSON.stringify(edges, null, 2));
     
-    const kgData = {
-      // 保留原始meta，补全默认值
-      meta: result.meta || { keyword: keyword, upload_time: new Date().toISOString() },
-      // 补全nodes中空字段
-      nodes: nodes.map(node => ({
-        ...node, // 复用原有所有字段（node_id/name/confidence等）
-        domain: node.domain || "未知领域", // 空字符串补为"未知领域"
-        definition: node.definition || "暂无定义", // 空字符串补为"暂无定义"
-        confidence: Math.max(0.6, Math.min(1.0, Number(node.confidence) || 0.8)) // 确保数值范围
-      })),
-      // edges无需修改（你已能拿到合法数据），仅确保字段完整
-      edges: edges.map(edge => ({
-        ...edge,
-        confidence: Math.max(0.6, Math.min(1.0, Number(edge.confidence) || 0.8))
-      }))
-    };
-    console.log("预处理后入库数据：", kgData);
-
-    // 将结果入库Neo4j
-    const insertResponse = await fetch(`${API_BASE2}/api/kg/insert/from-front`, {
-      method: "POST", // 入库用POST
-      headers: {"Content-Type": "application/json",},
-      body: JSON.stringify(kgData), // 把前端处理后的kgData转成JSON字符串传给后端
-    });
-
-    // 处理入库结果
-    const insertResult = await insertResponse.json();
-    if (insertResult.code === 200) {
-      console.log("数据成功入库Neo4j：", insertResult);
-      alert("图谱数据已成功存入数据库！");
-    } else {
-      console.error("入库失败：", insertResult.msg);
-      alert(`入库失败：${insertResult.msg}`);
-    }
-
-    // 单独打印核心的nodes和edges
-
-
     if (result && nodes) {
       // 转换数据格式
       allNodes = transformNodes(nodes);
@@ -1018,7 +788,14 @@ async function searchConcept() {
         }
       }
 
-      updateStatus(`找到 ${currentNodes.length} 个相关概念`);
+      const ingested = Boolean(result?.meta?.ingested);
+      if (currentNodes.length === 0) {
+        updateStatus("未找到相关概念");
+      } else if (ingested) {
+        updateStatus(`已挖掘并入库: 找到 ${currentNodes.length} 个相关概念`);
+      } else {
+        updateStatus(`已从数据库命中: 找到 ${currentNodes.length} 个相关概念`);
+      }
     } else {
       updateStatus("未找到相关概念");
     }
@@ -1091,6 +868,10 @@ function localSearch(keyword) {
 }
 
 async function showRandomGraph() {
+  if (!bootstrapReady && allNodes.length < 2) {
+    updateStatus("图谱初始化中，暂不可随机探索");
+    return;
+  }
   // 从现有学科中随机选择
   const domains = [...new Set(allNodes.map((n) => n.domain))].filter((d) => d);
 
@@ -1868,11 +1649,13 @@ function updateStatus(message) {
     statusEl.textContent = message;
 
     // 5秒后清除状态消息
-    setTimeout(() => {
-      if (statusEl.textContent === message) {
-        statusEl.textContent = "就绪 - 点击节点或连线查看详情";
-      }
-    }, 5000);
+    if (!String(message).includes("初始化")) {
+      setTimeout(() => {
+        if (statusEl.textContent === message) {
+          statusEl.textContent = "就绪 - 点击节点或连线查看详情";
+        }
+      }, 5000);
+    }
   }
 }
 
@@ -2026,101 +1809,83 @@ function bindEvents() {
   }
 }
 
+async function mineConcept(keyword) {
+  if (!keyword) return;
+
+  showLoading(`正在利用AI挖掘 "${keyword}" 的关联数据...`);
+  updateStatus(`正在挖掘: ${keyword}`);
+
+  try {
+    const response = await fetch(`${API_BASE2}/api/agent/generate_ingest?keyword=${encodeURIComponent(keyword)}&points=5`, {
+       method: "POST"
+    });
+    const result = await response.json();
+    console.log("AI挖掘结果：", result);
+
+    if (result && result.nodes && result.nodes.length > 0) {
+        // 1. 本地合并数据 (支持无数据库模式或数据库写入失败时的临时展示)
+        const minedNodes = transformNodes(result.nodes);
+        const minedEdges = transformEdges(result.edges);
+        
+        let newCount = 0;
+        minedNodes.forEach(node => {
+            if (!allNodes.some(n => n.id === node.id)) {
+                allNodes.push(node);
+                newCount++;
+            }
+        });
+        
+        minedEdges.forEach(edge => {
+             if (!allEdges.some(e => e.id === edge.id)) {
+                allEdges.push(edge);
+            }
+        });
+        
+        currentNodes = [...allNodes];
+        currentEdges = [...allEdges];
+        renderGraph();
+        
+        // 2. 尝试从后端刷新 (可选)
+        // await loadData(); 
+        
+        // 3. 高亮并选中
+        const matchedNode = allNodes.find(n => n.name === keyword || n.name.includes(keyword));
+        if (matchedNode) {
+            selectNode(matchedNode.id);
+            updateStatus(`挖掘成功: 新增 ${newCount} 个概念`);
+            closeModal(); 
+        } else {
+             updateStatus("挖掘完成");
+        }
+        
+        showModal("挖掘完成", `
+            <div style="padding: 20px;">
+                <h3>AI挖掘完成</h3>
+                <p>已成功挖掘 "${keyword}" 相关的 ${result.edges.length} 条关联。</p>
+                <p style="font-size: 12px; color: #666; margin-top: 8px;">注意：如果数据库未连接，刷新页面后数据可能会丢失。</p>
+                <button onclick="closeModal()" class="btn-small btn-primary">确定</button>
+            </div>
+        `);
+    } else {
+        updateStatus("AI未能挖掘到有效信息");
+        alert("AI挖掘未返回有效结果，可能是模型未配置或概念过于生僻。");
+    }
+
+  } catch (error) {
+    console.error("AI挖掘失败:", error);
+    updateStatus("挖掘请求失败");
+    alert("挖掘失败，请检查后端服务或网络。");
+  } finally {
+    hideLoading();
+  }
+}
+
 // ============== 模拟API调用 ==============
 function callAgentAPI(nodeId) {
   const node = currentNodes.find((n) => n.id === nodeId);
   if (!node) return;
-
-  showLoading("智能体正在挖掘关联...");
-
-  // 模拟API调用延迟
-  setTimeout(() => {
-    // 模拟挖掘到的新关联
-    const newEdges = [
-      {
-        source: nodeId,
-        target: "math_3",
-        relation_type: "应用",
-        relation_desc: `${node.name} 的概念在微积分中有重要应用`,
-        confidence: 0.78,
-        evidence: "相关学术论文 (Journal of Applied Mathematics, 2023)",
-      },
-      {
-        source: nodeId,
-        target: "cs_3",
-        relation_type: "启发",
-        relation_desc: `${node.name} 的思想对机器学习算法有启发作用`,
-        confidence: 0.72,
-        evidence: "人工智能研究进展 (NeurIPS 2022)",
-      },
-    ];
-
-    // 添加新边
-    newEdges.forEach((edge) => {
-      if (
-        !currentEdges.some(
-          (e) => e.source === edge.source && e.target === edge.target
-        )
-      ) {
-        currentEdges.push(edge);
-      }
-    });
-
-    hideLoading();
-    renderGraph();
-
-    showModal(
-      "智能体挖掘结果",
-      `
-            <div style="padding: 20px;">
-                <h3 style="margin-bottom: 16px;">智能体挖掘完成</h3>
-                <p style="margin-bottom: 16px; color: #475569;">
-                    为 "<strong>${node.name}</strong>" 挖掘到 <strong>${
-        newEdges.length
-      }</strong> 条新的跨学科关联：
-                </p>
-                <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
-                    ${newEdges
-                      .map((edge) => {
-                        const targetNode = currentNodes.find(
-                          (n) => n.id === edge.target
-                        );
-                        return `
-                        <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #e0f2fe;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                                <strong style="color: #0369a1;">${
-                                  edge.relation_type
-                                }</strong>
-                                <span style="color: ${
-                                  edge.confidence > 0.8
-                                    ? "#10b981"
-                                    : edge.confidence > 0.6
-                                    ? "#f59e0b"
-                                    : "#ef4444"
-                                }">
-                                    ${Math.round(edge.confidence * 100)}% 置信度
-                                </span>
-                            </div>
-                            <div style="color: #475569; font-size: 14px;">${
-                              node.name
-                            } → ${targetNode?.name || "未知概念"}</div>
-                            <div style="color: #64748b; font-size: 13px; margin-top: 4px;">${
-                              edge.relation_desc
-                            }</div>
-                            <div style="color: #94a3b8; font-size: 12px; margin-top: 4px;">
-                                <em>${edge.evidence}</em>
-                            </div>
-                        </div>`;
-                      })
-                      .join("")}
-                </div>
-                <button onclick="closeModal()" class="btn-small btn-primary">确定</button>
-            </div>
-        `
-    );
-
-    updateStatus(`智能体为 "${node.name}" 挖掘到 ${newEdges.length} 条新关联`);
-  }, 2000);
+  
+  mineConcept(node.name);
 }
 
 // ============== 初始化应用 ==============

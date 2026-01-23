@@ -22,6 +22,7 @@ def deepseek_llm(prompt: str) -> Dict[str, Any]:
             "response_format": {"type": "json_object"}
         }
         
+        print(f"DeepSeek request -> model={model} url={base_url}")
         response = requests.post(base_url, headers=headers, json=data, timeout=30)
         if response.status_code == 200:
             content = response.json()["choices"][0]["message"]["content"]
